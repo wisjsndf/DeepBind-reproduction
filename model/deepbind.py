@@ -1,0 +1,43 @@
+import torch
+import torch.nn as nn
+
+class DeepBind(nn.Module):
+    def __init__(
+        self,
+        num_kernels: int = 16,
+        kernel_size: int = 24,
+        fc_hidden: int = 32,
+        conv_bias: float = 0.0,
+    ):
+        super().__init__()
+        self.conv = nn.Conv1d(
+            in_channels=4,
+            out_channels=num_kernels,
+            kernel_size=kernel_size,
+            bias=True
+        )
+        nn.init.constant_(self.conv.bias, conv_bias)
+        self.relu = nn.ReLU()
+        self.fc = nn.Sequencial(
+            nn.Linear(2 * num_kernels, fc_hidden),
+            nn.ReLU(),
+            nn.Linear(fc_hidden, 1)
+        )
+        self._init_weights()
+    
+    def _init_weights(self):
+        nn.init.xavier_uniform_(self.conv.weight)
+        for layer in self.fc:
+            if isinstance(layer, nn.Linear):
+                nn.init.xavier_uniform_(layer.weight)
+                nn.init_zeros_(layer.bias)
+                
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        h = self.conv(x)
+        h = self.relu(h)
+        h_max = h.amax(dim=2)
+        h_avg = h.mean(dim=2)
+        h_cat = torch.cat([h_max, h_avg], dim=1)
+        out = self.fc(h_cat).squeeze(1)
+        return out
+        
