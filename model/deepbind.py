@@ -7,6 +7,7 @@ class DeepBind(nn.Module):
         num_kernels: int = 16,
         kernel_size: int = 24,
         fc_hidden: int = 32,
+        dropout_rate: float = 0.0,
         conv_bias: float = 0.0,
     ):
         super().__init__()
@@ -18,11 +19,15 @@ class DeepBind(nn.Module):
         )
         nn.init.constant_(self.conv.bias, conv_bias)
         self.relu = nn.ReLU()
-        self.fc = nn.Sequencial(
-            nn.Linear(2 * num_kernels, fc_hidden),
-            nn.ReLU(),
-            nn.Linear(fc_hidden, 1)
-        )
+        if fc_hidden and int(fc_hidden) > 0:
+            self.fc = nn.Sequential(
+                nn.Linear(2 * num_kernels, int(fc_hidden)),
+                nn.ReLU(),
+                nn.Dropout(p=float(dropout_rate)) if dropout_rate and float(dropout_rate) > 0.0 else nn.Identity(),
+                nn.Linear(int(fc_hidden), 1)
+            )
+        else:
+            self.fc = nn.Linear(2 * num_kernels, 1)
         self._init_weights()
     
     def _init_weights(self):
@@ -30,7 +35,7 @@ class DeepBind(nn.Module):
         for layer in self.fc:
             if isinstance(layer, nn.Linear):
                 nn.init.xavier_uniform_(layer.weight)
-                nn.init_zeros_(layer.bias)
+                nn.init.zeros_(layer.bias)
                 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         h = self.conv(x)
